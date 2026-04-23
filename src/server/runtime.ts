@@ -57,6 +57,11 @@ async function fetchSessionSnapshotWithMetadata(input: FetchInput): Promise<{
       : Promise.resolve(createSuccessfulResult([])),
   ])
 
+  const attemptedCount =
+    2 +
+    (input.includeTodos && input.client.todo ? 1 : 0) +
+    (input.includeDiff && input.client.diff ? 1 : 0)
+
   const failures = [sessionResult, messagesResult, todoResult, diffResult].filter(
     (result): result is Extract<SettledCallResult, { ok: false }> => !result.ok,
   )
@@ -74,7 +79,7 @@ async function fetchSessionSnapshotWithMetadata(input: FetchInput): Promise<{
   const captureMetadata: Pick<CaptureMetadata, "status" | "partial" | "errorMessage"> =
     failures.length === 0
       ? { status: "fresh", partial: false }
-      : failures.length === 4
+      : failures.length === attemptedCount
         ? { status: "error", partial: true, errorMessage }
         : { status: "partial", partial: true, errorMessage }
 
