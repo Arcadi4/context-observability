@@ -109,6 +109,19 @@ export async function observeSession(input: ObserveSessionInput): Promise<Sessio
   return record
 }
 
+export function markSessionDisabled(sessionID: string, maxRecentSessions?: number): void {
+  const emptySnapshot = { messages: [], todo: [], diff: [] }
+  const summary = buildSessionSummary(emptySnapshot)
+  summary.sessionID = sessionID
+  const captureMetadata: CaptureMetadata = {
+    status: "disabled",
+    source: "unknown",
+    capturedAt: new Date().toISOString(),
+    partial: false,
+  }
+  saveSessionObservation({ snapshot: emptySnapshot, summary, captureMetadata }, maxRecentSessions)
+}
+
 export function readObservedSession(sessionID: string) {
   return getSessionObservation(sessionID)
 }

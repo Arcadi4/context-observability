@@ -1,13 +1,17 @@
 import type { Config, Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 
 import { resolveOptions } from "./server/options"
-import { observeSession } from "./server/runtime"
+import { markSessionDisabled, observeSession } from "./server/runtime"
 import type { CaptureSource, ObservabilityPluginOptions } from "./shared/types"
 
 export const pluginId = "context-observability"
 
 const server: Plugin = async (input, rawOptions) => {
   const options = resolveOptions(rawOptions as ObservabilityPluginOptions | undefined)
+
+  const isCaptureDisabled = !options.capture.sessionCompaction &&
+    !options.capture.toolExecutions &&
+    !options.capture.experimentalMessagesTransform
 
   const ensureObservation = async (sessionID: string, source: CaptureSource) => {
     await observeSession({
@@ -53,6 +57,10 @@ const server: Plugin = async (input, rawOptions) => {
       try {
         const sessionID = readSessionID(event)
         if (!sessionID) return
+        if (isCaptureDisabled) {
+          markSessionDisabled(sessionID, options.maxRecentSessions)
+          return
+        }
         await ensureObservation(sessionID, "event")
       } catch (error) {
         logHookFailure("event", error, false)
