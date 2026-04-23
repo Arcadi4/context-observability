@@ -47,7 +47,7 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
       <box flexDirection="column" padding={1} gap={1} minWidth={72}>
         <text>Context Observability — /{props.commandName}</text>
         <text>Session: {props.sessionID || "(none)"}</text>
-        <text>No observation data yet.</text>
+        <text>No observation data yet. Run a command or wait for an event to trigger capture.</text>
       </box>
     )
   }
@@ -58,6 +58,37 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
   const capturedAt = formatRelativeTime(captureMetadata.capturedAt)
   const source = captureMetadata.source
 
+  if (captureMetadata.status === "disabled") {
+    return (
+      <box flexDirection="column" padding={1} gap={1} minWidth={72}>
+        <text>Context Observability — /{props.commandName}</text>
+        <text>Session: {title}</text>
+        <text>Capture is disabled in plugin configuration.</text>
+      </box>
+    )
+  }
+
+  if (captureMetadata.status === "error") {
+    return (
+      <box flexDirection="column" padding={1} gap={1} minWidth={72}>
+        <text>Context Observability — /{props.commandName}</text>
+        <text>Session: {title}</text>
+        <text>Capture failed {status}  Source: {source}  At: {capturedAt}</text>
+        {captureMetadata.errorMessage
+          ? <text>Error: {captureMetadata.errorMessage}</text>
+          : <text>Error: capture encountered an unknown failure.</text>}
+      </box>
+    )
+  }
+
+  // Warning banner for partial or degraded
+  const warningBanner: JSX.Element | null =
+    captureMetadata.status === "partial"
+      ? <text>⚠ Partial capture — some data may be missing</text>
+      : captureMetadata.status === "degraded"
+        ? <text>⚠ Degraded capture — data may be stale or incomplete</text>
+        : null
+
   const msgLine = `Messages: ${summary.messageCount}  Tool calls: ${summary.toolCallCount}`
   const todoLine = `Todos: ${summary.todo.total} total  ${summary.todo.completed} done  ${summary.todo.pending} pending`
   const diffLine = `Diff: ${summary.diff.files} file${summary.diff.files !== 1 ? "s" : ""}  +${summary.diff.added} -${summary.diff.removed}`
@@ -67,6 +98,7 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
     <box flexDirection="column" padding={1} gap={1} minWidth={72}>
       <text>Context Observability — /{props.commandName}</text>
       <text>Session: {title}</text>
+      {warningBanner}
       <text>Status: {status}  Source: {source}  Captured: {capturedAt}</text>
       {captureMetadata.errorMessage ? <text>Error: {captureMetadata.errorMessage}</text> : null}
       <text>{msgLine}</text>
