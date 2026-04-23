@@ -2,14 +2,14 @@ import type { Config, Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 
 import { resolveOptions } from "./server/options"
 import { observeSession } from "./server/runtime"
-import type { ObservabilityPluginOptions } from "./shared/types"
+import type { CaptureSource, ObservabilityPluginOptions } from "./shared/types"
 
 export const pluginId = "context-observability"
 
 const server: Plugin = async (input, rawOptions) => {
   const options = resolveOptions(rawOptions as ObservabilityPluginOptions | undefined)
 
-  const ensureObservation = async (sessionID: string) => {
+  const ensureObservation = async (sessionID: string, source: CaptureSource) => {
     await observeSession({
       client: {
         get: (targetSessionID) => input.client.session.get({ path: { id: targetSessionID } }),
@@ -21,7 +21,20 @@ const server: Plugin = async (input, rawOptions) => {
       maxMessages: options.maxMessages,
       includeDiff: options.includeDiff,
       includeTodos: options.includeTodos,
+      source,
     })
+  }
+
+  const logHookFailure = (hook: string, error: unknown, experimental: boolean) => {
+    const message = error instanceof Error ? error.message : String(error)
+    if (experimental) {
+      if (options.capture.onExperimentalFailure === "warn") {
+        console.warn(`[${pluginId}] ${hook} capture failed: ${message}`)
+      }
+      return
+    }
+
+    console.warn(`[${pluginId}] ${hook} capture failed: ${message}`)
   }
 
   const hooks: Hooks = {
@@ -36,27 +49,48 @@ const server: Plugin = async (input, rawOptions) => {
       }
     },
     async event({ event }) {
-      const sessionID = readSessionID(event)
-      if (!sessionID) return
-      await ensureObservation(sessionID)
+      try {
+        const sessionID = readSessionID(event)
+        if (!sessionID) return
+        await ensureObservation(sessionID, "event")
+      } catch (error) {
+        logHookFailure("event", error, false)
+      }
     },
     async "command.execute.before"(command, output) {
-      if (command.command !== options.commandName) return
-      await ensureObservation(command.sessionID)
+      try {
+        if (command.command !== options.commandName) return
+        await ensureObservation(command.sessionID, "command")
+      } catch (error) {
+        logHookFailure("command.execute.before", error, false)
+      }
     },
     async "experimental.chat.messages.transform"(_input, output) {
-      if (!options.capture.experimentalMessagesTransform) return
-      const toolParts = output.messages.flatMap((message) => message.parts).filter((part) => part.type === "tool")
-      if (toolParts.length === 0) return
+      try {
+        if (!options.capture.experimentalMessagesTransform) return
+        // Intentionally a no-op for now: tool-part counting exploration started here,
+        // but capture should remain centralized in observeSession() until this hook has a clear use.
+        void output
+      } catch (error) {
+        logHookFailure("experimental.chat.messages.transform", error, true)
+      }
     },
     async "experimental.session.compacting"(input, output) {
-      if (!options.capture.sessionCompaction) return
-      await ensureObservation(input.sessionID)
-      output.context.push("Context observability plugin captured a fresh pre-compaction snapshot for this session.")
+      try {
+        if (!options.capture.sessionCompaction) return
+        await ensureObservation(input.sessionID, "compaction")
+        output.context.push("Context observability plugin captured a fresh pre-compaction snapshot for this session.")
+      } catch (error) {
+        logHookFailure("experimental.session.compacting", error, true)
+      }
     },
     async "tool.execute.after"(input) {
-      if (!options.capture.toolExecutions) return
-      await ensureObservation(input.sessionID)
+      try {
+        if (!options.capture.toolExecutions) return
+        await ensureObservation(input.sessionID, "tool")
+      } catch (error) {
+        logHookFailure("tool.execute.after", error, false)
+      }
     },
   }
 
