@@ -1,0 +1,15 @@
+{
+  "commandName": "context",
+  "commandTemplate": "/context $ARGUMENTS",
+  "maxMessages": 100,
+  "maxRecentSessions": 20,
+  "includeDiff": true,
+  "includeTodos": true,
+  "showDialogByDefault": true,
+  "capture": {
+    "experimentalMessagesTransform": true,
+    "sessionCompaction": true,
+    "toolExecutions": true,
+    "onExperimentalFailure": "warn"
+  }
+}
