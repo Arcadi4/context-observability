@@ -1,5 +1,5 @@
 import { buildSessionSummary } from "../shared/session-summary"
-import type { SessionSnapshot, SessionObservationRecord } from "../shared/types"
+import type { CaptureMetadata, SessionSnapshot, SessionObservationRecord } from "../shared/types"
 import { getSessionObservation, saveSessionObservation } from "./store"
 
 type SessionClient = {
@@ -36,7 +36,13 @@ export async function fetchSessionSnapshot(input: FetchInput): Promise<SessionSn
 export async function observeSession(input: FetchInput): Promise<SessionObservationRecord> {
   const snapshot = await fetchSessionSnapshot(input)
   const summary = buildSessionSummary(snapshot)
-  const record = { snapshot, summary }
+  const captureMetadata: CaptureMetadata = {
+    status: "fresh",
+    source: "unknown",
+    capturedAt: new Date().toISOString(),
+    partial: false,
+  }
+  const record = { snapshot, summary, captureMetadata }
   saveSessionObservation(record)
   return record
 }
