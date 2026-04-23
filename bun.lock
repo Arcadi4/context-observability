@@ -4,17 +4,16 @@
   "workspaces": {
     "": {
       "name": "context-observability",
-      "dependencies": {
-        "@opencode-ai/plugin": "^1.14.22",
-      },
       "devDependencies": {
+        "@opencode-ai/plugin": "^1.14.22",
         "@opentui/core": "^0.1.102",
         "@opentui/solid": "^0.1.102",
         "@types/bun": "latest",
-        "@types/node": "^25.6.0",
+        "typescript": "^6.0.3",
       },
       "peerDependencies": {
-        "typescript": "^6.0.3",
+        "@opencode-ai/plugin": "^1.14.22",
+        "typescript": "^5.9.0",
       },
     },
   },
