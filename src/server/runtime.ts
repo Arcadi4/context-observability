@@ -13,6 +13,7 @@ type FetchInput = {
   client: SessionClient
   sessionID: string
   maxMessages: number
+  maxRecentSessions?: number
   includeDiff: boolean
   includeTodos: boolean
 }
@@ -104,7 +105,7 @@ export async function observeSession(input: ObserveSessionInput): Promise<Sessio
     errorMessage: captureState.errorMessage,
   }
   const record = { snapshot, summary, captureMetadata }
-  saveSessionObservation(record)
+  saveSessionObservation(record, input.maxRecentSessions)
   return record
 }
 

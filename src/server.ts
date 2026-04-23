@@ -19,6 +19,7 @@ const server: Plugin = async (input, rawOptions) => {
       },
       sessionID,
       maxMessages: options.maxMessages,
+      maxRecentSessions: options.maxRecentSessions,
       includeDiff: options.includeDiff,
       includeTodos: options.includeTodos,
       source,

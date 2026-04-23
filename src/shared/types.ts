@@ -5,7 +5,6 @@ export type ObservabilityPluginOptions = {
   maxRecentSessions?: number
   includeDiff?: boolean
   includeTodos?: boolean
-  showDialogByDefault?: boolean
   capture?: {
     experimentalMessagesTransform?: boolean
     sessionCompaction?: boolean

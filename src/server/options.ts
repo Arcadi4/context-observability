@@ -7,7 +7,6 @@ const defaultOptions: Required<ObservabilityPluginOptions> = {
   maxRecentSessions: 20,
   includeDiff: true,
   includeTodos: true,
-  showDialogByDefault: true,
   capture: {
     experimentalMessagesTransform: true,
     sessionCompaction: true,
