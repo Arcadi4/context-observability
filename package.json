@@ -43,6 +43,8 @@
     "opencode": ">=1.14.22"
   },
   "scripts": {
+    "dev:opencode": "bun ./scripts/dev-opencode.ts",
+    "dev:opencode:check": "bun ./scripts/dev-opencode.ts --run 'verification ping'",
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test",
     "check": "bun run typecheck && bun test"
