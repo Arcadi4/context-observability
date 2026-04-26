@@ -17,6 +17,15 @@ export type SessionMessageLike = {
   info?: {
     id?: string
     role?: string
+    tokens?: {
+      input?: number
+      output?: number
+      reasoning?: number
+      cache?: {
+        read?: number
+        write?: number
+      }
+    }
   }
   parts?: Array<Record<string, unknown>>
 }
@@ -63,6 +72,14 @@ export type SessionSummary = {
   }
   lastUserText: string | null
   generatedAt: string
+  tokens: {
+    total: number
+    input: number
+    output: number
+    reasoning: number
+    cacheRead: number
+    cacheWrite: number
+  }
 }
 
 export type CaptureStatus = "fresh" | "partial" | "degraded" | "error" | "disabled"
@@ -81,4 +98,16 @@ export type SessionObservationRecord = {
   summary: SessionSummary
   snapshot: SessionSnapshot
   captureMetadata: CaptureMetadata
+}
+
+export type ContextItemType = "user" | "assistant" | "tool" | "file" | "system"
+
+export type ContextItem = {
+  id: string
+  type: ContextItemType
+  title: string
+  preview: string
+  tokens: number
+  timestamp?: string
+  metadata?: Record<string, unknown>
 }

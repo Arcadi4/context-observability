@@ -5,6 +5,7 @@ import type {
   SessionSummary,
   SessionTodoLike,
 } from "./types"
+import { calculateMessageTokens } from "./token-counter"
 
 function countToolParts(messages: SessionMessageLike[]): number {
   return messages.reduce((total, message) => {
@@ -59,15 +60,32 @@ function findLastUserText(messages: SessionMessageLike[]): string | null {
 }
 
 export function buildSessionSummary(snapshot: SessionSnapshot): SessionSummary {
+  const messages = snapshot.messages
+
+  const inputTokens = messages.reduce((sum, msg) => sum + (msg.info?.tokens?.input || 0), 0)
+  const outputTokens = messages.reduce((sum, msg) => sum + (msg.info?.tokens?.output || 0), 0)
+  const reasoningTokens = messages.reduce((sum, msg) => sum + (msg.info?.tokens?.reasoning || 0), 0)
+  const cacheReadTokens = messages.reduce((sum, msg) => sum + (msg.info?.tokens?.cache?.read || 0), 0)
+  const cacheWriteTokens = messages.reduce((sum, msg) => sum + (msg.info?.tokens?.cache?.write || 0), 0)
+  const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
+
   return {
     sessionID: snapshot.session?.id ?? null,
     title: snapshot.session?.title ?? null,
     workspaceID: snapshot.session?.workspaceID ?? null,
-    messageCount: snapshot.messages.length,
-    toolCallCount: countToolParts(snapshot.messages),
+    messageCount: messages.length,
+    toolCallCount: countToolParts(messages),
     todo: summarizeTodos(snapshot.todo),
     diff: summarizeDiff(snapshot.diff),
-    lastUserText: findLastUserText(snapshot.messages),
+    lastUserText: findLastUserText(messages),
     generatedAt: new Date().toISOString(),
+    tokens: {
+      total: totalTokens,
+      input: inputTokens,
+      output: outputTokens,
+      reasoning: reasoningTokens,
+      cacheRead: cacheReadTokens,
+      cacheWrite: cacheWriteTokens,
+    },
   }
 }
