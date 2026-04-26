@@ -1,12 +1,13 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal } from "solid-js"
+import { createSignal, createMemo } from "solid-js"
 import type { JSX } from "@opentui/solid"
 import { useKeyboard } from "@opentui/solid"
 
-import type { CaptureStatus, SessionObservationRecord } from "../shared/types"
+import type { CaptureStatus, SessionObservationRecord, ContextItem } from "../shared/types"
 import type { ObservationBridge } from "../server/bridge"
-
-type View = "overview" | "messages" | "todos" | "diff" | "metadata"
+import { formatTokenCount } from "../shared/token-counter"
+import { transformMessagesToContextItems, transformDiffToContextItems } from "./transform-messages"
+import { ContextItemList } from "./context-item-list"
 
 type ContextObservabilityDialogProps = {
   commandName: string
@@ -41,175 +42,89 @@ function statusLabel(status: CaptureStatus): string {
 
 function truncate(text: string, max: number): string {
   if (text.length <= max) return text
-  return text.slice(0, max - 1) + "…"
-}
-
-function extractTextFromParts(parts: Array<Record<string, unknown>>): string {
-  for (const part of parts) {
-    if (typeof part["text"] === "string" && part["text"].length > 0) {
-      return part["text"]
-    }
-  }
-  return ""
+  return text.slice(0, max - 1) + "..."
 }
 
 export function ContextObservabilityDialog(props: ContextObservabilityDialogProps): JSX.Element {
-  const [view, setView] = createSignal<View>("overview")
+  const [selectedSection, setSelectedSection] = createSignal<"all" | "messages" | "files">("all")
 
-  useKeyboard((key) => {
-    if (view() === "overview") {
-      if (key.name === "m") setView("messages")
-      else if (key.name === "t") setView("todos")
-      else if (key.name === "d") setView("diff")
-      else if (key.name === "i") setView("metadata")
-    } else {
-      if (key.name === "o") setView("overview")
-    }
+  const record = props.sessionID
+    ? props.bridge.getCurrentRecord(props.sessionID) ?? props.fallbackRecord ?? null
+    : props.fallbackRecord ?? null
+
+  const contextItems = createMemo<ContextItem[]>(() => {
+    if (!record) return []
+
+    const items: ContextItem[] = []
+    items.push(...transformMessagesToContextItems(record.snapshot.messages))
+    items.push(...transformDiffToContextItems(record.snapshot.diff))
+    return items
   })
 
-  const record = props.sessionID ? props.bridge.getCurrentRecord(props.sessionID) ?? props.fallbackRecord ?? null : props.fallbackRecord ?? null
+  const filteredItems = createMemo(() => {
+    const items = contextItems()
+    if (selectedSection() === "all") return items
+    if (selectedSection() === "messages") return items.filter((i) => i.type !== "file")
+    if (selectedSection() === "files") return items.filter((i) => i.type === "file")
+    return items
+  })
+
+  const totalTokens = createMemo(() => {
+    return contextItems().reduce((sum, item) => sum + item.tokens, 0)
+  })
+
+  useKeyboard((key) => {
+    if (key.name === "1") setSelectedSection("all")
+    else if (key.name === "2") setSelectedSection("messages")
+    else if (key.name === "3") setSelectedSection("files")
+    else if (key.name === "q" || key.name === "escape") {
+    }
+  })
 
   if (!record) {
     return (
       <box flexDirection="column" padding={1} gap={1} minWidth={72}>
-        <text>Context Observability — /{props.commandName}</text>
+        <text>Context Observability</text>
         <text>Session: {props.sessionID || "(none)"}</text>
-        <text>No observation data yet. Run a command or wait for an event to trigger capture.</text>
+        <text>No observation data yet.</text>
       </box>
     )
   }
 
-  const { summary, snapshot, captureMetadata } = record
+  const { summary, captureMetadata } = record
   const title = summary.title || props.sessionID || "(unknown)"
   const status = statusLabel(captureMetadata.status)
   const capturedAt = formatRelativeTime(captureMetadata.capturedAt)
-  const source = captureMetadata.source
-
-  if (captureMetadata.status === "disabled") {
-    return (
-      <box flexDirection="column" padding={1} gap={1} minWidth={72}>
-        <text>Context Observability — /{props.commandName}</text>
-        <text>Session: {title}</text>
-        <text>Capture is disabled in plugin configuration.</text>
-      </box>
-    )
-  }
-
-  if (captureMetadata.status === "error") {
-    return (
-      <box flexDirection="column" padding={1} gap={1} minWidth={72}>
-        <text>Context Observability — /{props.commandName}</text>
-        <text>Session: {title}</text>
-        <text>Capture failed {status}  Source: {source}  At: {capturedAt}</text>
-        {captureMetadata.errorMessage
-          ? <text>Error: {captureMetadata.errorMessage}</text>
-          : <text>Error: capture encountered an unknown failure.</text>}
-      </box>
-    )
-  }
-
-  const warningBanner: JSX.Element | null =
-    captureMetadata.status === "partial"
-      ? <text>⚠ Partial capture — some data may be missing</text>
-      : captureMetadata.status === "degraded"
-        ? <text>⚠ Degraded capture — data may be stale or incomplete</text>
-        : null
+  const tokens = formatTokenCount(totalTokens())
+  const items = summary.messageCount
+  const tools = summary.toolCallCount
+  const files = summary.diff.files
 
   return (
-    <box flexDirection="column" padding={1} gap={1} minWidth={72}>
-      {() => {
-        const currentView = view()
+    <box flexDirection="column" padding={1} gap={1} minWidth={80} minHeight={24}>
+      <box flexDirection="column" borderStyle="single" padding={1}>
+        <text>Context Observability /{props.commandName}</text>
+        <text>Session: {truncate(title, 50)}</text>
+        <text>Status: {status} Captured: {capturedAt}</text>
+        <text>Tokens: {tokens} | Items: {items} | Tools: {tools} | Files: {files}</text>
+      </box>
 
-        if (currentView === "overview") {
-          const msgLine = `Messages: ${summary.messageCount}  Tool calls: ${summary.toolCallCount}`
-          const todoLine = `Todos: ${summary.todo.total} total  ${summary.todo.completed} done  ${summary.todo.pending} pending`
-          const diffLine = `Diff: ${summary.diff.files} file${summary.diff.files !== 1 ? "s" : ""}  +${summary.diff.added} -${summary.diff.removed}`
-          const lastUser = summary.lastUserText ? truncate(summary.lastUserText, 80) : "(none)"
+      <box flexDirection="row" gap={2}>
+        <text>[1] All [2] Messages [3] Files</text>
+      </box>
 
-          return (
-            <>
-              <text>Context Observability — /{props.commandName}</text>
-              <text>Session: {title}</text>
-              {warningBanner}
-              <text>Status: {status}  Source: {source}  Captured: {capturedAt}</text>
-              {captureMetadata.errorMessage ? <text>Error: {captureMetadata.errorMessage}</text> : null}
-              <text>{msgLine}</text>
-              <text>{todoLine}</text>
-              <text>{diffLine}</text>
-              <text>Last user: {lastUser}</text>
-              <text>[m]essages  [t]odos  [d]iff  [i]nfo</text>
-            </>
-          )
-        }
+      <box flexGrow={1} borderStyle="single" padding={1}>
+        <ContextItemList
+          items={filteredItems()}
+          onSelect={(item) => {
+            console.log("Selected:", item)
+          }}
+        />
+      </box>
 
-        if (currentView === "messages") {
-          const msgs = snapshot.messages
-          return (
-            <>
-              <text>Messages ({msgs.length})</text>
-              {msgs.length === 0
-                ? <text>(none)</text>
-                : msgs.map((msg) => {
-                    const role = msg.info?.role ?? "unknown"
-                    const text = msg.parts ? truncate(extractTextFromParts(msg.parts), 72) : ""
-                    return <text>{role}: {text || "(no text)"}</text>
-                  })
-              }
-              <text>[o]verview</text>
-            </>
-          )
-        }
-
-        if (currentView === "todos") {
-          const todos = snapshot.todo
-          return (
-            <>
-              <text>Todos ({todos.length})</text>
-              {todos.length === 0
-                ? <text>(none)</text>
-                : todos.map((todo) => {
-                    const todoStatus = todo.status ?? "?"
-                    const content = todo.content ? truncate(todo.content, 68) : "(no content)"
-                    return <text>[{todoStatus}] {content}</text>
-                  })
-              }
-              <text>[o]verview</text>
-            </>
-          )
-        }
-
-        if (currentView === "diff") {
-          const diffs = snapshot.diff
-          return (
-            <>
-              <text>Changed files ({diffs.length})</text>
-              {diffs.length === 0
-                ? <text>(none)</text>
-                : diffs.map((d) => {
-                    const file = d.file ?? "(unknown)"
-                    const added = d.added ?? 0
-                    const removed = d.removed ?? 0
-                    return <text>{truncate(file, 56)}  +{added} -{removed}</text>
-                  })
-              }
-              <text>[o]verview</text>
-            </>
-          )
-        }
-
-        const meta = captureMetadata
-        return (
-          <>
-            <text>Capture Metadata</text>
-            <text>Status:     {meta.status}</text>
-            <text>Source:     {meta.source}</text>
-            <text>Captured:   {meta.capturedAt}</text>
-            <text>Partial:    {String(meta.partial)}</text>
-            {meta.errorMessage ? <text>Error:      {meta.errorMessage}</text> : null}
-            <text>[o]verview</text>
-          </>
-        )
-      }}
+      <box flexDirection="row" gap={2}>
+        <text>[j/k] Navigate [1/2/3] Filter [Q] Quit</text>
+      </box>
     </box>
   )
 }
