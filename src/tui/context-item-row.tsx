@@ -29,13 +29,20 @@ export function ContextItemRow(props: ContextItemRowProps): JSX.Element {
   const label = getTypeLabel(props.item.type)
   const tokens = formatTokenCount(props.item.tokens)
   const title = props.item.title.slice(0, 40)
+  const selected = props.isSelected ?? false
 
   return (
-    <box flexDirection="row" gap={1} padding={1}>
-      <text>{icon}</text>
-      <text>{label}</text>
-      <text flexGrow={1}>{title}</text>
-      <text>{tokens}</text>
+    <box
+      flexDirection="row"
+      gap={1}
+      padding={1}
+      borderStyle={selected ? "single" : undefined}
+      borderColor={selected ? "cyan" : undefined}
+    >
+      <text fg={selected ? "cyan" : undefined}>{icon}</text>
+      <text fg={selected ? "cyan" : undefined}>{label}</text>
+      <text fg={selected ? "cyan" : undefined} flexGrow={1}>{title}</text>
+      <text fg={selected ? "cyan" : undefined}>{tokens}</text>
     </box>
   )
 }
