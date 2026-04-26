@@ -45,6 +45,7 @@
   "scripts": {
     "dev:opencode": "bun ./scripts/dev-opencode.ts",
     "dev:opencode:check": "bun ./scripts/dev-opencode.ts --run 'verification ping'",
+    "dev:seed-session": "bun ./scripts/seed-opencode-session.ts",
     "typecheck": "bunx tsc --noEmit",
     "test": "bun test",
     "check": "bun run typecheck && bun test"
