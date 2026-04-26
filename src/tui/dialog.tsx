@@ -110,7 +110,9 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
       </box>
 
       <box flexDirection="row" gap={2}>
-        <text>[1] All [2] Messages [3] Files</text>
+        <text fg={selectedSection() === "all" ? "cyan" : undefined}>[1] All</text>
+        <text fg={selectedSection() === "messages" ? "cyan" : undefined}>[2] Messages</text>
+        <text fg={selectedSection() === "files" ? "cyan" : undefined}>[3] Files</text>
       </box>
 
       <box flexGrow={1} borderStyle="single" padding={1}>
@@ -123,7 +125,10 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
       </box>
 
       <box flexDirection="row" gap={2}>
-        <text>[j/k] Navigate [1/2/3] Filter [Q] Quit</text>
+        <text>[↑/↓j/k] Navigate</text>
+        <text>[Enter] Select</text>
+        <text>[1/2/3] Filter</text>
+        <text>[Q] Quit</text>
       </box>
     </box>
   )
