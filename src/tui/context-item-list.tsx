@@ -1,5 +1,5 @@
 /** @jsxImportSource @opentui/solid */
-import { createSignal, createMemo, For } from "solid-js"
+import { createSignal, For } from "solid-js"
 import type { JSX } from "@opentui/solid"
 import { useKeyboard } from "@opentui/solid"
 
@@ -34,11 +34,9 @@ export function ContextItemList(props: ContextItemListProps): JSX.Element {
     }
   })
 
-  const items = createMemo(() => props.items)
-
   return (
     <box flexDirection="column" flexGrow={1} overflow="hidden">
-      <For each={items()}>
+      <For each={props.items}>
         {(item, index) => (
           <ContextItemRow
             item={item}

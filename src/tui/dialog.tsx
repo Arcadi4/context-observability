@@ -77,8 +77,6 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
     if (key.name === "1") setSelectedSection("all")
     else if (key.name === "2") setSelectedSection("messages")
     else if (key.name === "3") setSelectedSection("files")
-    else if (key.name === "q" || key.name === "escape") {
-    }
   })
 
   if (!record) {
