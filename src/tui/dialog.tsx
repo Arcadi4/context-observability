@@ -3,7 +3,7 @@ import { createSignal } from "solid-js"
 import type { JSX } from "@opentui/solid"
 import { useKeyboard } from "@opentui/solid"
 
-import type { CaptureStatus } from "../shared/types"
+import type { CaptureStatus, SessionObservationRecord } from "../shared/types"
 import type { ObservationBridge } from "../server/bridge"
 
 type View = "overview" | "messages" | "todos" | "diff" | "metadata"
@@ -12,6 +12,7 @@ type ContextObservabilityDialogProps = {
   commandName: string
   sessionID: string
   bridge: ObservationBridge
+  fallbackRecord?: SessionObservationRecord | null
 }
 
 function formatRelativeTime(isoString: string): string {
@@ -66,7 +67,7 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
     }
   })
 
-  const record = props.sessionID ? props.bridge.getCurrentRecord(props.sessionID) : null
+  const record = props.sessionID ? props.bridge.getCurrentRecord(props.sessionID) ?? props.fallbackRecord ?? null : props.fallbackRecord ?? null
 
   if (!record) {
     return (
