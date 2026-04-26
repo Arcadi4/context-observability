@@ -24,18 +24,19 @@ function transformMessageToContextItems(message: SessionMessageLike, index: numb
   const messageTokens = calculateMessageTokens(message)
 
   const textPreview = extractTextPreview(message.parts ?? [])
-  const isToolMessage = message.parts?.some((p) => p.type === "tool")
 
+  // Message row shows full token count from API (actual data, not distributed)
   items.push({
     id: message.info?.id ?? `msg-${index}`,
     type: role as ContextItem["type"],
     title: textPreview,
     preview: textPreview,
-    tokens: isToolMessage ? Math.floor(messageTokens / 2) : messageTokens,
+    tokens: messageTokens,
     timestamp: new Date().toISOString(),
     metadata: { role, partCount: message.parts?.length ?? 0 },
   })
 
+  // Tool rows show estimated tokens from serialized input (tools are part of message context)
   if (message.parts) {
     for (const part of message.parts) {
       if (part.type === "tool") {
@@ -43,12 +44,16 @@ function transformMessageToContextItems(message: SessionMessageLike, index: numb
         const input = part.input as Record<string, unknown> | undefined
         const args = input ? JSON.stringify(input).slice(0, 50) : ""
 
+        // Estimate tool tokens from serialized input size (4 chars per token)
+        const toolInputStr = input ? JSON.stringify(input) : ""
+        const toolTokens = estimateTextTokens(`${toolName}${toolInputStr}`)
+
         items.push({
           id: `${message.info?.id ?? index}-tool-${toolName}`,
           type: "tool",
           title: `${toolName}(${args})`,
           preview: `Tool call: ${toolName}`,
-          tokens: Math.floor(messageTokens / (message.parts.length * 2)),
+          tokens: toolTokens,
           timestamp: new Date().toISOString(),
           metadata: { tool: toolName, input },
         })
