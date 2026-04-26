@@ -1,4 +1,4 @@
-import type { Config, Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
+import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 
 import { resolveOptions } from "./server/options"
 import { markSessionDisabled, observeSession } from "./server/runtime"
@@ -43,16 +43,6 @@ const server: Plugin = async (input, rawOptions) => {
   }
 
   const hooks: Hooks = {
-    async config(config: Config) {
-      const commandName = options.commandName
-      config.command ??= {}
-      if (!config.command[commandName]) {
-        config.command[commandName] = {
-          template: options.commandTemplate,
-          description: "Open the context observability overview for the current session.",
-        }
-      }
-    },
     async event({ event }) {
       try {
         const sessionID = readSessionID(event)
