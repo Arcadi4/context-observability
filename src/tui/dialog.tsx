@@ -2,18 +2,19 @@
 import { createSignal, createMemo } from "solid-js"
 import type { JSX } from "@opentui/solid"
 import { useKeyboard } from "@opentui/solid"
+import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 
 import type { CaptureStatus, SessionObservationRecord, ContextItem } from "../shared/types"
 import type { ObservationBridge } from "../server/bridge"
 import { formatTokenCount } from "../shared/token-counter"
 import { transformMessagesToContextItems, transformDiffToContextItems } from "./transform-messages"
-import { ContextItemList } from "./context-item-list"
 
 type ContextObservabilityDialogProps = {
   commandName: string
   sessionID: string
   bridge: ObservationBridge
   fallbackRecord?: SessionObservationRecord | null
+  api: TuiPluginApi
 }
 
 function formatRelativeTime(isoString: string): string {
@@ -45,8 +46,24 @@ function truncate(text: string, max: number): string {
   return text.slice(0, max - 1) + "..."
 }
 
+function getItemIcon(type: ContextItem["type"]): string {
+  switch (type) {
+    case "user": return "👤"
+    case "assistant": return "🤖"
+    case "tool": return "🔧"
+    case "file": return "📄"
+    case "system": return "⚙️"
+    default: return "•"
+  }
+}
+
+function itemCategory(type: ContextItem["type"]): string {
+  return type === "file" ? "files" : "messages"
+}
+
 export function ContextObservabilityDialog(props: ContextObservabilityDialogProps): JSX.Element {
   const [selectedSection, setSelectedSection] = createSignal<"all" | "messages" | "files">("all")
+  const [selectedItemID, setSelectedItemID] = createSignal<string | undefined>()
 
   const record = props.sessionID
     ? props.bridge.getCurrentRecord(props.sessionID) ?? props.fallbackRecord ?? null
@@ -73,10 +90,47 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
     return contextItems().reduce((sum, item) => sum + item.tokens, 0)
   })
 
+  const dialogSelectOptions = createMemo(() =>
+    filteredItems().map((item) => ({
+      title: `${getItemIcon(item.type)} ${item.type.toUpperCase()} ${truncate(item.title, 40)}`,
+      value: item.id,
+      description: item.preview,
+      footer: formatTokenCount(item.tokens),
+      category: itemCategory(item.type),
+    }))
+  )
+
+  const moveSelectedItem = (direction: number) => {
+    const options = dialogSelectOptions()
+    if (options.length === 0) return
+    const currentIndex = options.findIndex((option) => option.value === selectedItemID())
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0
+    const nextIndex = (safeIndex + direction + options.length) % options.length
+    setSelectedItemID(options[nextIndex]?.value)
+  }
+
   useKeyboard((key) => {
-    if (key.name === "1") setSelectedSection("all")
-    else if (key.name === "2") setSelectedSection("messages")
-    else if (key.name === "3") setSelectedSection("files")
+    if (key.name === "1") {
+      key.preventDefault()
+      key.stopPropagation()
+      setSelectedSection("all")
+    } else if (key.name === "2") {
+      key.preventDefault()
+      key.stopPropagation()
+      setSelectedSection("messages")
+    } else if (key.name === "3") {
+      key.preventDefault()
+      key.stopPropagation()
+      setSelectedSection("files")
+    } else if (key.name === "j") {
+      key.preventDefault()
+      key.stopPropagation()
+      moveSelectedItem(1)
+    } else if (key.name === "k") {
+      key.preventDefault()
+      key.stopPropagation()
+      moveSelectedItem(-1)
+    }
   })
 
   if (!record) {
@@ -98,6 +152,8 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
   const tools = summary.toolCallCount
   const files = summary.diff.files
 
+  const DialogSelect = props.api.ui.DialogSelect
+
   return (
     <box flexDirection="column" padding={1} gap={1} minWidth={80} minHeight={24}>
       <box flexDirection="column" borderStyle="single" padding={1}>
@@ -113,12 +169,14 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
         <text fg={selectedSection() === "files" ? "cyan" : undefined}>[3] Files</text>
       </box>
 
-      <box flexGrow={1} borderStyle="single" padding={1}>
-        <ContextItemList
-          items={filteredItems()}
-          onSelect={(item) => {
-            console.log("Selected:", item)
-          }}
+      <box flexGrow={1}>
+        <DialogSelect
+          title="Context Items"
+          options={dialogSelectOptions()}
+          current={selectedItemID()}
+          skipFilter={true}
+          onMove={(option) => setSelectedItemID(option.value)}
+          onSelect={() => {}}
         />
       </box>
 
@@ -126,7 +184,7 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
         <text>[↑/↓j/k] Navigate</text>
         <text>[Enter] Select</text>
         <text>[1/2/3] Filter</text>
-        <text>[Q] Quit</text>
+        <text>[esc] Quit</text>
       </box>
     </box>
   )
