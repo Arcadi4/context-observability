@@ -98,8 +98,14 @@ const server: Plugin = async (input, rawOptions) => {
 
 function readSessionID(event: unknown): string | null {
   if (!event || typeof event !== "object") return null
-  const candidate = (event as Record<string, unknown>).sessionID
-  return typeof candidate === "string" ? candidate : null
+  const eventRecord = event as Record<string, unknown>
+  const candidate = eventRecord.sessionID
+  if (typeof candidate === "string") return candidate
+
+  const properties = eventRecord.properties
+  if (!properties || typeof properties !== "object") return null
+  const nestedCandidate = (properties as Record<string, unknown>).sessionID
+  return typeof nestedCandidate === "string" ? nestedCandidate : null
 }
 
 const plugin: PluginModule & { id: string } = {

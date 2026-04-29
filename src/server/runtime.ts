@@ -101,7 +101,7 @@ export async function fetchSessionSnapshot(input: FetchInput): Promise<SessionSn
 
 export async function observeSession(input: ObserveSessionInput): Promise<SessionObservationRecord> {
   const { snapshot, captureMetadata: captureState } = await fetchSessionSnapshotWithMetadata(input)
-  const summary = buildSessionSummary(snapshot)
+  const summary = buildSessionSummary(snapshot, input.sessionID)
   const captureMetadata: CaptureMetadata = {
     status: captureState.status,
     source: input.source ?? "unknown",

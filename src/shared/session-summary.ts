@@ -59,7 +59,7 @@ function findLastUserText(messages: SessionMessageLike[]): string | null {
   return null
 }
 
-export function buildSessionSummary(snapshot: SessionSnapshot): SessionSummary {
+export function buildSessionSummary(snapshot: SessionSnapshot, fallbackSessionID?: string): SessionSummary {
   const messages = snapshot.messages
 
   const inputTokens = messages.reduce((sum, msg) => sum + (msg.info?.tokens?.input || 0), 0)
@@ -70,7 +70,7 @@ export function buildSessionSummary(snapshot: SessionSnapshot): SessionSummary {
   const totalTokens = inputTokens + outputTokens + reasoningTokens + cacheReadTokens + cacheWriteTokens
 
   return {
-    sessionID: snapshot.session?.id ?? null,
+    sessionID: snapshot.session?.id ?? fallbackSessionID ?? null,
     title: snapshot.session?.title ?? null,
     workspaceID: snapshot.session?.workspaceID ?? null,
     messageCount: messages.length,
