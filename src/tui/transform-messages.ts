@@ -6,21 +6,34 @@ function extractTextPreview(parts: Array<Record<string, unknown>>): string {
     if (part.type === "text" && typeof part.text === "string") {
       return part.text.slice(0, 80)
     }
-    if (part.type === "file" && typeof part.file === "string") {
-      return `File: ${part.file}`
+    if (part.type === "file") {
+      const path = (part.source as Record<string, unknown> | undefined)?.path as string | undefined
+      if (typeof path === "string") return `File: ${path}`
+      if (typeof part.filename === "string") return `File: ${part.filename}`
+      if (typeof part.url === "string") return `File: ${part.url}`
     }
-    if (part.type === "tool" && typeof part.tool === "string") {
-      const input = part.input as Record<string, unknown> | undefined
+    if (part.type === "tool") {
+      const toolName = typeof part.tool === "string" ? part.tool : "unknown"
+      const state = part.state as Record<string, unknown> | undefined
+      const input = state?.input as Record<string, unknown> | undefined
       const args = input ? Object.keys(input).join(", ") : ""
-      return `Tool: ${part.tool}(${args})`
+      const title = state?.title as string | undefined
+      return title ? `Tool: ${title}` : `Tool: ${toolName}(${args})`
     }
   }
   return "(no preview)"
 }
 
+function normalizeRole(role: string | undefined): "user" | "assistant" | "system" {
+  if (role === "user") return "user"
+  if (role === "assistant") return "assistant"
+  return "system"
+}
+
 function transformMessageToContextItems(message: SessionMessageLike, index: number): ContextItem[] {
   const items: ContextItem[] = []
-  const role = message.info?.role ?? "unknown"
+  const rawRole = message.info?.role ?? "system"
+  const role = normalizeRole(rawRole)
   const messageTokens = calculateMessageTokens(message)
 
   const textPreview = extractTextPreview(message.parts ?? [])
@@ -33,7 +46,7 @@ function transformMessageToContextItems(message: SessionMessageLike, index: numb
     preview: textPreview,
     tokens: messageTokens,
     timestamp: new Date().toISOString(),
-    metadata: { role, partCount: message.parts?.length ?? 0 },
+    metadata: { role: rawRole, partCount: message.parts?.length ?? 0 },
   })
 
   // Tool rows show estimated tokens from serialized input (tools are part of message context)
@@ -41,22 +54,40 @@ function transformMessageToContextItems(message: SessionMessageLike, index: numb
     for (const part of message.parts) {
       if (part.type === "tool") {
         const toolName = typeof part.tool === "string" ? part.tool : "unknown"
-        const input = part.input as Record<string, unknown> | undefined
+        const state = part.state as Record<string, unknown> | undefined
+        const input = state?.input as Record<string, unknown> | undefined
         const args = input ? JSON.stringify(input).slice(0, 50) : ""
+        const stateTitle = state?.title as string | undefined
 
-        // Estimate tool tokens from serialized input size (4 chars per token)
         const toolInputStr = input ? JSON.stringify(input) : ""
         const toolTokens = estimateTextTokens(`${toolName}${toolInputStr}`)
 
         items.push({
           id: `${message.info?.id ?? index}-tool-${toolName}`,
           type: "tool",
-          title: `${toolName}(${args})`,
+          title: stateTitle ?? `${toolName}(${args})`,
           preview: `Tool call: ${toolName}`,
           tokens: toolTokens,
           timestamp: new Date().toISOString(),
-          metadata: { tool: toolName, input },
+          metadata: { tool: toolName, input, stateTitle },
         })
+      }
+
+      if (part.type === "patch") {
+        const files = part.files as string[] | undefined
+        if (files) {
+          for (const file of files) {
+            items.push({
+              id: `${message.info?.id ?? index}-patch-${file}`,
+              type: "file",
+              title: file,
+              preview: `Patch: ${file}`,
+              tokens: estimateTextTokens(file),
+              timestamp: new Date().toISOString(),
+              metadata: { patchFile: file },
+            })
+          }
+        }
       }
     }
   }
