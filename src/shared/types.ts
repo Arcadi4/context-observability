@@ -17,6 +17,12 @@ export type SessionMessageLike = {
   info?: {
     id?: string
     role?: string
+    providerID?: string
+    modelID?: string
+    provider?: string
+    model?: string
+    cost?: number
+    time?: unknown
     tokens?: {
       input?: number
       output?: number
