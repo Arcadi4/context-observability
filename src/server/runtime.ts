@@ -1,6 +1,8 @@
 import { buildSessionSummary } from "../shared/session-summary"
-import type { CaptureMetadata, CaptureSource, SessionSnapshot, SessionObservationRecord } from "../shared/types"
+import type { CaptureMetadata, CaptureSource, SessionSnapshot, SessionObservationRecord, ApiCallRecord } from "../shared/types"
 import { getSessionObservation, saveSessionObservation } from "./store"
+import type { ApiCallTruthStore } from "./api-call-truth-store"
+import { toSharedApiCallRecord } from "./api-call-truth-store"
 
 type SessionClient = {
   get: (sessionID: string) => Promise<{ data?: unknown }>
@@ -20,6 +22,7 @@ type FetchInput = {
 
 type ObserveSessionInput = FetchInput & {
   source?: CaptureSource
+  truthStore?: ApiCallTruthStore
 }
 
 type SettledCallResult =
@@ -109,7 +112,20 @@ export async function observeSession(input: ObserveSessionInput): Promise<Sessio
     partial: captureState.partial,
     errorMessage: captureState.errorMessage,
   }
-  const record = { snapshot, summary, captureMetadata }
+
+  // Fetch API calls from truth store if available
+  let apiCalls: ApiCallRecord[] | undefined
+  if (input.truthStore) {
+    try {
+      const internalRecords = input.truthStore.getAllForSession(input.sessionID)
+      apiCalls = internalRecords.map(toSharedApiCallRecord)
+    } catch {
+      // API-call fetch failure doesn't block session observation
+      apiCalls = undefined
+    }
+  }
+
+  const record: SessionObservationRecord = { snapshot, summary, captureMetadata, apiCalls }
   saveSessionObservation(record, input.maxRecentSessions)
   return record
 }

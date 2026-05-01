@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { transformMessagesToContextItems, transformDiffToContextItems } from "./transform-messages"
-import type { SessionMessageLike } from "../shared/types"
+import { transformMessagesToContextItems, transformDiffToContextItems, transformApiCallsToContextItems, transformSessionToContextItems } from "./transform-messages"
+import type { SessionMessageLike, ApiCallRecord } from "../shared/types"
 
 describe("transformMessagesToContextItems", () => {
   test("transforms user message to context item", () => {

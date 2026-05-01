@@ -1,11 +1,13 @@
 import type {
+  ApiCallRecord,
+  ApiProviderFamily,
   SessionDiffLike,
   SessionMessageLike,
   SessionSnapshot,
   SessionSummary,
   SessionTodoLike,
 } from "./types"
-import { calculateMessageTokens } from "./token-counter"
+import { estimateTextTokens } from "./token-counter"
 
 function countToolParts(messages: SessionMessageLike[]): number {
   return messages.reduce((total, message) => {
@@ -59,6 +61,70 @@ function findLastUserText(messages: SessionMessageLike[]): string | null {
   return null
 }
 
+function summarizeApiCalls(apiCalls: ApiCallRecord[]): SessionSummary["apiCalls"] {
+  if (apiCalls.length === 0) {
+    return {
+      count: 0,
+      providers: {
+        anthropic: 0,
+        openai: 0,
+        gemini: 0,
+        bedrock: 0,
+        unknown: 0,
+      },
+      requestBytes: { total: 0, avg: 0, max: 0 },
+      timing: { avgDurationMs: 0, totalDurationMs: 0 },
+      estimatedInputTokens: 0,
+    }
+  }
+
+  const providers: Record<ApiProviderFamily, number> = {
+    anthropic: 0,
+    openai: 0,
+    gemini: 0,
+    bedrock: 0,
+    unknown: 0,
+  }
+
+  let totalBytes = 0
+  let maxBytes = 0
+  let totalDurationMs = 0
+  let durationCount = 0
+  let estimatedInputTokens = 0
+
+  for (const call of apiCalls) {
+    providers[call.provider] = (providers[call.provider] || 0) + 1
+
+    const bytes = call.originalBodyBytes || 0
+    totalBytes += bytes
+    if (bytes > maxBytes) maxBytes = bytes
+
+    if (call.timing?.durationMs != null) {
+      totalDurationMs += call.timing.durationMs
+      durationCount += 1
+    }
+
+    if (call.bodyPreview) {
+      estimatedInputTokens += estimateTextTokens(call.bodyPreview)
+    }
+  }
+
+  return {
+    count: apiCalls.length,
+    providers,
+    requestBytes: {
+      total: totalBytes,
+      avg: Math.round(totalBytes / apiCalls.length),
+      max: maxBytes,
+    },
+    timing: {
+      avgDurationMs: durationCount > 0 ? Math.round(totalDurationMs / durationCount) : 0,
+      totalDurationMs,
+    },
+    estimatedInputTokens,
+  }
+}
+
 export function buildSessionSummary(snapshot: SessionSnapshot, fallbackSessionID?: string): SessionSummary {
   const messages = snapshot.messages
 
@@ -87,5 +153,6 @@ export function buildSessionSummary(snapshot: SessionSnapshot, fallbackSessionID
       cacheRead: cacheReadTokens,
       cacheWrite: cacheWriteTokens,
     },
+    apiCalls: summarizeApiCalls(snapshot.apiCalls ?? []),
   }
 }

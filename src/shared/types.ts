@@ -57,6 +57,7 @@ export type SessionSnapshot = {
   messages: SessionMessageLike[]
   todo: SessionTodoLike[]
   diff: SessionDiffLike[]
+  apiCalls?: ApiCallRecord[]
 }
 
 export type SessionSummary = {
@@ -85,6 +86,13 @@ export type SessionSummary = {
     reasoning: number
     cacheRead: number
     cacheWrite: number
+  }
+  apiCalls: {
+    count: number
+    providers: Record<ApiProviderFamily, number>
+    requestBytes: { total: number; avg: number; max: number }
+    timing: { avgDurationMs: number; totalDurationMs: number }
+    estimatedInputTokens: number
   }
 }
 

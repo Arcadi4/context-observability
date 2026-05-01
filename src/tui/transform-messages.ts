@@ -1,4 +1,4 @@
-import type { ContextItem, SessionMessageLike } from "../shared/types"
+import type { ApiCallRecord, ContextItem, SessionMessageLike } from "../shared/types"
 import { calculateMessageTokens, estimateTextTokens } from "../shared/token-counter"
 
 function extractTextPreview(parts: Array<Record<string, unknown>>): string {
@@ -117,4 +117,72 @@ export function transformDiffToContextItems(diff: Array<{ file?: string; added?:
       tokens: estimateTextTokens(`${d.file}\n${"+".repeat(d.added)}${"-".repeat(d.removed)}`),
       metadata: { added: d.added, removed: d.removed },
     }))
+}
+
+function extractHostFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url)
+    return urlObj.hostname
+  } catch {
+    // If URL parsing fails, try to extract host manually
+    const match = url.match(/^https?:\/\/([^\/]+)/)
+    return match?.[1] ?? url
+  }
+}
+
+function truncateHost(host: string, maxLength: number = 30): string {
+  if (host.length <= maxLength) return host
+  return host.slice(0, maxLength - 3) + "..."
+}
+
+export function transformApiCallsToContextItems(apiCalls: ApiCallRecord[]): ContextItem[] {
+  return apiCalls.map((apiCall) => {
+    const host = extractHostFromUrl(apiCall.url)
+    const truncatedHost = truncateHost(host)
+    const title = `${apiCall.method.toUpperCase()} ${apiCall.provider} ${truncatedHost}`
+
+    // Bounded preview - first 100 chars of body preview
+    const preview = apiCall.bodyPreview.slice(0, 100)
+
+    // Estimate tokens from body preview (actual tokens not available in ApiCallRecord)
+    const tokens = estimateTextTokens(apiCall.bodyPreview)
+
+    return {
+      id: apiCall.dedupeID ?? apiCall.id,
+      type: "api-call" as const,
+      title,
+      preview,
+      tokens,
+      timestamp: apiCall.timestamp,
+      metadata: {
+        bodyShape: apiCall.bodyShape,
+        bodyTruncated: apiCall.bodyTruncated,
+        originalBodyBytes: apiCall.originalBodyBytes,
+        timing: apiCall.timing,
+        url: apiCall.url,
+        method: apiCall.method,
+        provider: apiCall.provider,
+      },
+    }
+  })
+}
+
+export function transformSessionToContextItems(
+  messages: SessionMessageLike[],
+  diff?: Array<{ file?: string; added?: number; removed?: number }>,
+  apiCalls?: ApiCallRecord[]
+): ContextItem[] {
+  const items: ContextItem[] = []
+
+  items.push(...transformMessagesToContextItems(messages))
+
+  if (diff && diff.length > 0) {
+    items.push(...transformDiffToContextItems(diff))
+  }
+
+  if (apiCalls && apiCalls.length > 0) {
+    items.push(...transformApiCallsToContextItems(apiCalls))
+  }
+
+  return items
 }
