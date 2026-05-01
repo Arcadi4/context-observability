@@ -15,6 +15,12 @@
       "source": "wshobson/agents",
       "sourceType": "github",
       "computedHash": "3a3be8c925f96ac4e1280db28a01677e7ca5197f3792de2bbf35ab3bb324b6dd"
+    },
+    "using-tmux-for-interactive-commands": {
+      "source": "obra/superpowers-lab",
+      "sourceType": "github",
+      "skillPath": "skills/using-tmux-for-interactive-commands/SKILL.md",
+      "computedHash": "c056256933e832a5a48fffe68a481cce7fe5729e3645382a0656d592705d6a55"
     }
   }
 }
