@@ -7,7 +7,7 @@ import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { CaptureStatus, SessionObservationRecord, ContextItem } from "../shared/types"
 import type { ObservationBridge } from "../server/bridge"
 import { formatTokenCount } from "../shared/token-counter"
-import { transformMessagesToContextItems, transformDiffToContextItems } from "./transform-messages"
+import { transformMessagesToContextItems, transformDiffToContextItems, transformApiCallsToContextItems } from "./transform-messages"
 
 type ContextObservabilityDialogProps = {
   commandName: string
@@ -53,16 +53,19 @@ function getItemIcon(type: ContextItem["type"]): string {
     case "tool": return "🔧"
     case "file": return "📄"
     case "system": return "⚙️"
+    case "api-call": return "🌐"
     default: return "•"
   }
 }
 
 function itemCategory(type: ContextItem["type"]): string {
-  return type === "file" ? "files" : "messages"
+  if (type === "file") return "files"
+  if (type === "api-call") return "api"
+  return "messages"
 }
 
 export function ContextObservabilityDialog(props: ContextObservabilityDialogProps): JSX.Element {
-  const [selectedSection, setSelectedSection] = createSignal<"all" | "messages" | "files">("all")
+  const [selectedSection, setSelectedSection] = createSignal<"all" | "messages" | "files" | "api">("all")
   const [selectedItemID, setSelectedItemID] = createSignal<string | undefined>()
 
   const record = props.sessionID
@@ -75,14 +78,18 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
     const items: ContextItem[] = []
     items.push(...transformMessagesToContextItems(record.snapshot.messages))
     items.push(...transformDiffToContextItems(record.snapshot.diff))
+    if (record.snapshot.apiCalls) {
+      items.push(...transformApiCallsToContextItems(record.snapshot.apiCalls))
+    }
     return items
   })
 
   const filteredItems = createMemo(() => {
     const items = contextItems()
     if (selectedSection() === "all") return items
-    if (selectedSection() === "messages") return items.filter((i) => i.type !== "file")
+    if (selectedSection() === "messages") return items.filter((i) => i.type !== "file" && i.type !== "api-call")
     if (selectedSection() === "files") return items.filter((i) => i.type === "file")
+    if (selectedSection() === "api") return items.filter((i) => i.type === "api-call")
     return items
   })
 
@@ -122,6 +129,10 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
       key.preventDefault()
       key.stopPropagation()
       setSelectedSection("files")
+    } else if (key.name === "4") {
+      key.preventDefault()
+      key.stopPropagation()
+      setSelectedSection("api")
     } else if (key.name === "j") {
       key.preventDefault()
       key.stopPropagation()
@@ -167,6 +178,7 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
         <text fg={selectedSection() === "all" ? "cyan" : undefined}>[1] All</text>
         <text fg={selectedSection() === "messages" ? "cyan" : undefined}>[2] Messages</text>
         <text fg={selectedSection() === "files" ? "cyan" : undefined}>[3] Files</text>
+        <text fg={selectedSection() === "api" ? "cyan" : undefined}>[4] API</text>
       </box>
 
       <box flexGrow={1}>
@@ -183,7 +195,7 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
       <box flexDirection="row" gap={2}>
         <text>[↑/↓j/k] Navigate</text>
         <text>[Enter] Select</text>
-        <text>[1/2/3] Filter</text>
+        <text>[1/2/3/4] Filter</text>
         <text>[esc] Quit</text>
       </box>
     </box>
