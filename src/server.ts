@@ -1,10 +1,15 @@
 import type { Hooks, Plugin, PluginModule } from "@opencode-ai/plugin"
 
+import { createApiCallTruthStore, type InternalApiCallRecord } from "./server/api-call-truth-store"
 import { resolveOptions } from "./server/options"
+import { installGlobalProbe, wrapChatParamsFetch, type ProbeHandle } from "./server/probe"
 import { markSessionDisabled, observeSession } from "./server/runtime"
-import type { CaptureSource, ObservabilityPluginOptions } from "./shared/types"
+import type { CaptureSource, ObservabilityPluginOptions, CapturedApiCallFact } from "./shared/types"
 
 export const pluginId = "context-observability"
+
+let globalProbeHandle: ProbeHandle | null = null
+let globalTruthStore: ReturnType<typeof createApiCallTruthStore> | null = null
 
 const server: Plugin = async (input, rawOptions) => {
   const options = resolveOptions(rawOptions as ObservabilityPluginOptions | undefined)
@@ -12,6 +17,47 @@ const server: Plugin = async (input, rawOptions) => {
   const isCaptureDisabled = !options.capture.sessionCompaction &&
     !options.capture.toolExecutions &&
     !options.capture.experimentalMessagesTransform
+
+  if (!globalTruthStore) {
+    globalTruthStore = createApiCallTruthStore()
+  }
+
+  if (!globalProbeHandle) {
+    try {
+      globalProbeHandle = installGlobalProbe({
+        onCapture: (fact: CapturedApiCallFact) => {
+          if (!globalTruthStore) return
+
+          const record: InternalApiCallRecord = {
+            timestamp: Date.now(),
+            url: fact.url,
+            host: new URL(fact.url).hostname,
+            method: fact.method,
+            provider: fact.provider,
+            bodyShape: fact.bodyShape,
+            bodyPreview: typeof fact.body === "string" ? fact.body.slice(0, 1024) : null,
+            bodyTruncated: false,
+            originalBodyBytes: typeof fact.body === "string" ? fact.body.length : null,
+            sessionID: fact.sessionID ?? null,
+            source: fact.source,
+            timing: {
+              startTime: new Date(fact.capturedAt).getTime(),
+            },
+            dedupeID: fact.id,
+            sequence: Date.now(),
+          }
+
+          try {
+            globalTruthStore.capture(record)
+          } catch {
+            void 0
+          }
+        },
+      })
+    } catch {
+      void 0
+    }
+  }
 
   const ensureObservation = async (sessionID: string, source: CaptureSource) => {
     await observeSession({
@@ -64,11 +110,62 @@ const server: Plugin = async (input, rawOptions) => {
         logHookFailure("command.execute.before", error, false)
       }
     },
+    async "chat.params"(chatInput, output) {
+      try {
+        const sessionID = chatInput.sessionID
+
+        if (globalProbeHandle && globalTruthStore) {
+          const originalFetch = output.options.fetch ?? globalThis.fetch
+
+          output.options.fetch = wrapChatParamsFetch(originalFetch, {
+            sessionID,
+            onCapture: (fact: CapturedApiCallFact) => {
+              if (!globalTruthStore) return
+
+              const record: InternalApiCallRecord = {
+                timestamp: Date.now(),
+                url: fact.url,
+                host: new URL(fact.url).hostname,
+                method: fact.method,
+                provider: fact.provider,
+                bodyShape: fact.bodyShape,
+                bodyPreview: typeof fact.body === "string" ? fact.body.slice(0, 1024) : null,
+                bodyTruncated: false,
+                originalBodyBytes: typeof fact.body === "string" ? fact.body.length : null,
+                sessionID: fact.sessionID ?? sessionID ?? null,
+                source: fact.source,
+                timing: {
+                  startTime: new Date(fact.capturedAt).getTime(),
+                },
+                dedupeID: fact.id,
+                sequence: Date.now(),
+              }
+
+              try {
+                globalTruthStore.capture(record)
+              } catch {
+                void 0
+              }
+            },
+          })
+        }
+      } catch (error) {
+        logHookFailure("chat.params", error, false)
+      }
+    },
+    async "chat.headers"(chatInput, output) {
+      try {
+        const sessionID = chatInput.sessionID
+        if (sessionID) {
+          output.headers["x-opencode-session"] = sessionID
+        }
+      } catch (error) {
+        logHookFailure("chat.headers", error, false)
+      }
+    },
     async "experimental.chat.messages.transform"(_input, output) {
       try {
         if (!options.capture.experimentalMessagesTransform) return
-        // Intentionally a no-op for now: tool-part counting exploration started here,
-        // but capture should remain centralized in observeSession() until this hook has a clear use.
         void output
       } catch (error) {
         logHookFailure("experimental.chat.messages.transform", error, true)
