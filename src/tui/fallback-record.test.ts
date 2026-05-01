@@ -100,4 +100,24 @@ describe("buildTuiFallbackRecord", () => {
       { info: { id: "msg_missing", role: "assistant" }, parts: [] },
     ])
   })
+
+  test("works without server probe API-call data", () => {
+    const api = createApi([{ id: "msg_user", role: "user" }], {})
+
+    const record = buildTuiFallbackRecord(api as never, "ses_without_api_calls")
+
+    expect(record).not.toBeNull()
+    expect(record?.snapshot.apiCalls).toBeUndefined()
+    expect(record?.apiCalls).toBeUndefined()
+    expect(record?.summary.sessionID).toBe("ses_without_api_calls")
+    expect(record?.summary.apiCalls.count).toBe(0)
+    expect(record?.summary.apiCalls.requestBytes.total).toBe(0)
+    expect(record?.captureMetadata.status).toBe("degraded")
+  })
+
+  test("returns null without an active session id", () => {
+    const api = createApi([], {})
+
+    expect(buildTuiFallbackRecord(api as never, "")).toBeNull()
+  })
 })

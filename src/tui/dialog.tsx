@@ -7,7 +7,7 @@ import type { TuiPluginApi } from "@opencode-ai/plugin/tui"
 import type { CaptureStatus, SessionObservationRecord, ContextItem } from "../shared/types"
 import type { ObservationBridge } from "../server/bridge"
 import { formatTokenCount } from "../shared/token-counter"
-import { transformMessagesToContextItems, transformDiffToContextItems, transformApiCallsToContextItems } from "./transform-messages"
+import { buildContextItems } from "./build-context-items"
 
 type ContextObservabilityDialogProps = {
   commandName: string
@@ -74,14 +74,7 @@ export function ContextObservabilityDialog(props: ContextObservabilityDialogProp
 
   const contextItems = createMemo<ContextItem[]>(() => {
     if (!record) return []
-
-    const items: ContextItem[] = []
-    items.push(...transformMessagesToContextItems(record.snapshot.messages))
-    items.push(...transformDiffToContextItems(record.snapshot.diff))
-    if (record.snapshot.apiCalls) {
-      items.push(...transformApiCallsToContextItems(record.snapshot.apiCalls))
-    }
-    return items
+    return buildContextItems(record)
   })
 
   const filteredItems = createMemo(() => {

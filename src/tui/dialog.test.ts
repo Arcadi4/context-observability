@@ -1,6 +1,62 @@
 import { describe, expect, test } from "bun:test"
 import * as fs from "fs"
 import * as path from "path"
+import { buildContextItems } from "./build-context-items"
+import type { ApiCallRecord, SessionObservationRecord } from "../shared/types"
+
+function createRecord(apiCalls?: ApiCallRecord[]): SessionObservationRecord {
+  return {
+    summary: {
+      sessionID: "ses_test",
+      title: null,
+      workspaceID: null,
+      messageCount: 1,
+      toolCallCount: 0,
+      todo: { total: 0, completed: 0, pending: 0, other: 0 },
+      diff: { files: 0, added: 0, removed: 0 },
+      lastUserText: "hello",
+      generatedAt: "2024-01-01T00:00:00Z",
+      tokens: { total: 4, input: 4, output: 0, reasoning: 0, cacheRead: 0, cacheWrite: 0 },
+      apiCalls: {
+        count: apiCalls?.length ?? 0,
+        providers: { anthropic: apiCalls?.length ?? 0, openai: 0, gemini: 0, bedrock: 0, unknown: 0 },
+        requestBytes: { total: 0, avg: 0, max: 0 },
+        timing: { avgDurationMs: 0, totalDurationMs: 0 },
+        estimatedInputTokens: 0,
+      },
+    },
+    snapshot: {
+      session: { id: "ses_test", title: null, workspaceID: null },
+      messages: [{ info: { id: "msg_user", role: "user", tokens: { input: 4 } }, parts: [{ type: "text", text: "hello" }] }],
+      todo: [],
+      diff: [],
+      ...(apiCalls ? { apiCalls } : {}),
+    },
+    captureMetadata: {
+      status: "degraded",
+      source: "unknown",
+      capturedAt: "2024-01-01T00:00:00Z",
+      partial: true,
+    },
+  }
+}
+
+function createApiCall(): ApiCallRecord {
+  return {
+    id: "call_test",
+    timestamp: "2024-01-01T00:00:00Z",
+    url: "https://api.anthropic.com/v1/messages",
+    method: "POST",
+    provider: "anthropic",
+    bodyShape: "messages",
+    bodyPreview: "{\"messages\":[]}",
+    bodyTruncated: false,
+    originalBodyBytes: 15,
+    timing: { startedAt: "2024-01-01T00:00:00Z", durationMs: 20 },
+    sessionID: "ses_test",
+    source: "global",
+  }
+}
 
 describe("ContextObservabilityDialog footer", () => {
   test("footer should show [esc] Quit instead of [Q] Quit", () => {
@@ -167,5 +223,22 @@ describe("ContextObservabilityDialog API filter feasibility (T5)", () => {
 
     // Footer should mention filter keys including 4
     expect(source).toContain("[1/2/3/4]")
+  })
+})
+
+describe("ContextObservabilityDialog fallback record compatibility", () => {
+  test("records without API calls still render normal message items", () => {
+    const items = buildContextItems(createRecord())
+
+    expect(items).toHaveLength(1)
+    expect(items[0]?.type).toBe("user")
+    expect(items[0]?.title).toBe("hello")
+  })
+
+  test("records with API calls include API context items", () => {
+    const items = buildContextItems(createRecord([createApiCall()]))
+
+    expect(items.map((item) => item.type)).toEqual(["user", "api-call"])
+    expect(items[1]?.title).toBe("POST anthropic api.anthropic.com")
   })
 })
