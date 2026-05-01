@@ -100,13 +100,65 @@ export type CaptureMetadata = {
   errorMessage?: string
 }
 
+export type ApiCallSource = "global" | "chat.params"
+
+export type ApiProviderFamily =
+  | "anthropic"
+  | "openai"
+  | "gemini"
+  | "bedrock"
+  | "unknown"
+
+export type ApiCallBodyShape = "messages" | "input" | "contents" | "unknown"
+
+export type ApiCallTiming = {
+  startedAt: string
+  endedAt?: string
+  durationMs?: number
+}
+
+export type ApiCallRecord = {
+  id: string
+  timestamp: string
+  url: string
+  method: string
+  provider: ApiProviderFamily
+  bodyShape: ApiCallBodyShape
+  bodyPreview: string
+  bodyTruncated: boolean
+  originalBodyBytes: number
+  timing: ApiCallTiming
+  sessionID: string
+  source: ApiCallSource
+  dedupeID?: string
+}
+
+export type ApiCallBounds = {
+  maxRecentPerSession: number
+  maxBodyBytes: number
+}
+
+export type CapturedApiCallFact = {
+  id: string
+  url: string
+  method: string
+  headers: Record<string, string>
+  body: unknown
+  capturedAt: string
+  source: ApiCallSource
+  provider: ApiProviderFamily
+  bodyShape: ApiCallBodyShape
+  sessionID?: string
+}
+
 export type SessionObservationRecord = {
   summary: SessionSummary
   snapshot: SessionSnapshot
   captureMetadata: CaptureMetadata
+  apiCalls?: ApiCallRecord[]
 }
 
-export type ContextItemType = "user" | "assistant" | "tool" | "file" | "system"
+export type ContextItemType = "user" | "assistant" | "tool" | "file" | "system" | "api-call"
 
 export type ContextItem = {
   id: string
