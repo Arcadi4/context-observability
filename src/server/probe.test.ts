@@ -6,6 +6,7 @@ import {
   installGlobalProbe,
   isAiRequest,
   wrapChatParamsFetch,
+  __resetDedupeCache,
 } from "./probe"
 
 type MockFetchResponse = {
@@ -67,6 +68,7 @@ describe("probe", () => {
 
   beforeEach(() => {
     originalFetch = globalThis.fetch
+    __resetDedupeCache()
   })
 
   afterEach(() => {
@@ -223,14 +225,14 @@ describe("probe", () => {
   })
 
   describe("createDedupeKey", () => {
-    test("generates same key for equivalent string and URL forms", () => {
-      const keyString = createDedupeKey("https://api.anthropic.com/v1/messages")
-      const keyUrl = createDedupeKey(new URL("https://api.anthropic.com/v1/messages"))
+    test("generates same key for equivalent string and URL forms", async () => {
+      const keyString = await createDedupeKey("https://api.anthropic.com/v1/messages")
+      const keyUrl = await createDedupeKey(new URL("https://api.anthropic.com/v1/messages"))
 
       expect(keyString).toBe(keyUrl)
     })
 
-    test("generates same key for equivalent Request forms", () => {
+    test("generates same key for equivalent Request forms", async () => {
       const req1 = new Request("https://api.anthropic.com/v1/messages", {
         method: "POST",
         body: '{"model":"claude-3"}',
@@ -240,18 +242,18 @@ describe("probe", () => {
         body: '{"model":"claude-3"}',
       })
 
-      const key1 = createDedupeKey(req1)
-      const key2 = createDedupeKey(req2)
+      const key1 = await createDedupeKey(req1)
+      const key2 = await createDedupeKey(req2)
 
       expect(key1).toBe(key2)
     })
 
-    test("generates different keys for different payloads", () => {
-      const key1 = createDedupeKey("https://api.anthropic.com/v1/messages", {
+    test("generates different keys for different payloads", async () => {
+      const key1 = await createDedupeKey("https://api.anthropic.com/v1/messages", {
         method: "POST",
         body: '{"model":"claude-3-opus"}',
       })
-      const key2 = createDedupeKey("https://api.anthropic.com/v1/messages", {
+      const key2 = await createDedupeKey("https://api.anthropic.com/v1/messages", {
         method: "POST",
         body: '{"model":"claude-3-sonnet"}',
       })
@@ -259,16 +261,16 @@ describe("probe", () => {
       expect(key1).not.toBe(key2)
     })
 
-    test("generates different keys for different URLs", () => {
-      const key1 = createDedupeKey("https://api.anthropic.com/v1/messages")
-      const key2 = createDedupeKey("https://api.openai.com/v1/chat/completions")
+    test("generates different keys for different URLs", async () => {
+      const key1 = await createDedupeKey("https://api.anthropic.com/v1/messages")
+      const key2 = await createDedupeKey("https://api.openai.com/v1/chat/completions")
 
       expect(key1).not.toBe(key2)
     })
 
-    test("generates different keys for different methods", () => {
-      const key1 = createDedupeKey("https://api.anthropic.com/v1/messages", { method: "GET" })
-      const key2 = createDedupeKey("https://api.anthropic.com/v1/messages", { method: "POST" })
+    test("generates different keys for different methods", async () => {
+      const key1 = await createDedupeKey("https://api.anthropic.com/v1/messages", { method: "GET" })
+      const key2 = await createDedupeKey("https://api.anthropic.com/v1/messages", { method: "POST" })
 
       expect(key1).not.toBe(key2)
     })
