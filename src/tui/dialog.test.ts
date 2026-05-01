@@ -92,3 +92,80 @@ describe("ContextObservabilityDialog empty state and filter hardening", () => {
     expect(source).toContain('selectedSection() === "files"')
   })
 })
+
+describe("ContextObservabilityDialog API filter feasibility (T5)", () => {
+  test("expects [4] API filter label alongside existing filters", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    // Existing filters must remain
+    expect(source).toContain("[1] All")
+    expect(source).toContain("[2] Messages")
+    expect(source).toContain("[3] Files")
+    // New API filter expected
+    expect(source).toContain("[4] API")
+  })
+
+  test("expects api-call type in getItemIcon switch", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    expect(source).toContain('case "api-call"')
+  })
+
+  test("expects api category mapping in itemCategory", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    // itemCategory should map api-call to "api" category
+    expect(source).toContain('"api"')
+  })
+
+  test("expects key 4 keyboard shortcut for API filter", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    expect(source).toContain('key.name === "4"')
+  })
+
+  test("expects api section in selectedSection signal type", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    // Type should include "api" as a valid section
+    expect(source).toMatch(/"all"\s*\|\s*"messages"\s*\|\s*"files"\s*\|\s*"api"/)
+  })
+
+  test("expects api filter case in filteredItems memo", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    expect(source).toContain('selectedSection() === "api"')
+  })
+
+  test("expects api section highlight in filter indicator", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    expect(source).toContain('selectedSection() === "api"')
+  })
+
+  test("DialogSelect remains the active list component with API support", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    // DialogSelect should still be present
+    expect(source).toContain("DialogSelect")
+    // Should still use skipFilter
+    expect(source).toContain("skipFilter={true}")
+    // Should still map options with category
+    expect(source).toContain("category:")
+  })
+
+  test("message filter excludes api-call type (regression check)", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    // Messages filter should exclude both "file" and "api-call" types
+    // This ensures API calls don't appear in Messages filter
+    expect(source).toContain('selectedSection() === "messages"')
+  })
+
+  test("keyboard hints include [4] filter reference", () => {
+    const source = fs.readFileSync(path.join(__dirname, "dialog.tsx"), "utf-8")
+
+    // Footer should mention filter keys including 4
+    expect(source).toContain("[1/2/3/4]")
+  })
+})
