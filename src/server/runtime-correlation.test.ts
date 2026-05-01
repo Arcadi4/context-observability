@@ -2,11 +2,17 @@ import { describe, expect, mock, test } from "bun:test"
 import type {
   ApiCallRecord,
   CaptureMetadata,
-  SessionClient,
   SessionObservationRecord,
   SessionSnapshot,
   SessionSummary,
 } from "../shared/types"
+
+type SessionClient = {
+  get: (sessionID: string) => Promise<{ data?: unknown }>
+  messages: (input: { sessionID: string; limit?: number }) => Promise<{ data?: unknown }>
+  todo?: (input: { sessionID: string }) => Promise<{ data?: unknown }>
+  diff?: (input: { sessionID: string }) => Promise<{ data?: unknown }>
+}
 import { getObservationBridge, type ObservationBridge } from "./bridge"
 import { buildSessionSummary } from "../shared/session-summary"
 
@@ -199,9 +205,9 @@ async function fetchSessionSnapshotWithMetadataHybrid(
   return {
     snapshot: {
       session: sessionResult.ok ? (sessionResult.data as { data?: unknown }).data as SessionSnapshot["session"] : undefined,
-      messages: messagesResult.ok ? (messagesResult.data as { data?: unknown[] }).data ?? [] : [],
-      todo: todoResult.ok ? (todoResult.data as { data?: unknown[] }).data ?? [] : [],
-      diff: diffResult.ok ? (diffResult.data as { data?: unknown[] }).data ?? [] : [],
+      messages: messagesResult.ok ? ((messagesResult.data as { data?: unknown[] }).data ?? []) as SessionSnapshot["messages"] : [],
+      todo: todoResult.ok ? ((todoResult.data as { data?: unknown[] }).data ?? []) as SessionSnapshot["todo"] : [],
+      diff: diffResult.ok ? ((diffResult.data as { data?: unknown[] }).data ?? []) as SessionSnapshot["diff"] : [],
     },
     captureMetadata: {
       status,
@@ -290,9 +296,9 @@ describe("runtime correlation contract", () => {
       const record = assembleObservationRecord(snapshot, captureMetadata, apiCalls)
 
       expect(record.apiCalls).toHaveLength(2)
-      expect(record.apiCalls![0].id).toBe("call_001")
-      expect(record.apiCalls![1].id).toBe("call_002")
-      expect(record.apiCalls![1].provider).toBe("openai")
+      expect(record.apiCalls![0]!.id).toBe("call_001")
+      expect(record.apiCalls![1]!.id).toBe("call_002")
+      expect(record.apiCalls![1]!.provider).toBe("openai")
     })
 
     test("bridge returns enriched record with both API calls and session metadata", () => {
@@ -317,7 +323,7 @@ describe("runtime correlation contract", () => {
       expect(record.summary.sessionID).toBe("ses_123")
       expect(record.summary.title).toBe("Test Session")
       expect(record.apiCalls).toHaveLength(1)
-      expect(record.apiCalls![0].provider).toBe("anthropic")
+      expect(record.apiCalls![0]!.provider).toBe("anthropic")
     })
   })
 
@@ -350,7 +356,7 @@ describe("runtime correlation contract", () => {
       // API calls still exist
       const apiCalls = probeStore.getForSession("ses_123")
       expect(apiCalls).toHaveLength(1)
-      expect(apiCalls[0].url).toBe("https://api.anthropic.com/v1/messages")
+      expect(apiCalls[0]!.url).toBe("https://api.anthropic.com/v1/messages")
 
       // Session snapshot is degraded but API calls are preserved
       expect(captureMetadata.status).toBe("error")
@@ -459,9 +465,9 @@ describe("runtime correlation contract", () => {
       const calls = probeStore.getForSession("ses_123")
 
       // Should maintain capture order
-      expect(calls[0].id).toBe("call_001")
-      expect(calls[1].id).toBe("call_002")
-      expect(calls[2].id).toBe("call_003")
+      expect(calls[0]!.id).toBe("call_001")
+      expect(calls[1]!.id).toBe("call_002")
+      expect(calls[2]!.id).toBe("call_003")
     })
 
     test("session ID correlation works via header vs chat.params", () => {
@@ -624,9 +630,9 @@ describe("runtime correlation contract", () => {
 
       const apiCalls = probeStore.getForSession("ses_123")
 
-      expect(apiCalls[0].timing.durationMs).toBe(2500)
-      expect(apiCalls[0].timing.startedAt).toBe("2024-01-01T10:00:00.000Z")
-      expect(apiCalls[0].timing.endedAt).toBe("2024-01-01T10:00:02.500Z")
+      expect(apiCalls[0]!.timing.durationMs).toBe(2500)
+      expect(apiCalls[0]!.timing.startedAt).toBe("2024-01-01T10:00:00.000Z")
+      expect(apiCalls[0]!.timing.endedAt).toBe("2024-01-01T10:00:02.500Z")
 
       // Aggregate timing
       const totalDuration = apiCalls.reduce((sum, c) => sum + (c.timing.durationMs || 0), 0)
@@ -665,6 +671,9 @@ describe("runtime correlation contract", () => {
         getCurrentRecord: () => null,
         getRecentSummaries: () => [],
         getSessionDetail: () => null,
+        getSessionDetailWithApiCalls: () => null,
+        getApiCallsForSession: () => [],
+        getUnknownSessionCalls: () => [],
       }
 
       const record = bridge.getSessionDetail("nonexistent")
@@ -686,7 +695,7 @@ describe("runtime correlation contract", () => {
 
       // Session enrichment is async but doesn't block capture
       const slowClient = createMockSessionClient({
-        get: mock(() => new Promise((resolve) => setTimeout(() => resolve({ data: { id: "ses_123" } }), 100))),
+        get: mock(() => new Promise<{ data?: unknown }>((resolve) => setTimeout(() => resolve({ data: { id: "ses_123" } }), 100))),
         messages: mock(() => Promise.resolve({ data: [] })),
       })
 

@@ -206,6 +206,13 @@ test("SessionObservationRecord includes apiCalls array", () => {
         cacheRead: 0,
         cacheWrite: 0,
       },
+      apiCalls: {
+        count: 0,
+        providers: { anthropic: 0, openai: 0, gemini: 0, bedrock: 0, unknown: 0 },
+        requestBytes: { total: 0, avg: 0, max: 0 },
+        timing: { avgDurationMs: 0, totalDurationMs: 0 },
+        estimatedInputTokens: 0,
+      },
     },
     snapshot: {
       messages: [],
@@ -242,6 +249,13 @@ test("SessionObservationRecord with populated apiCalls", () => {
         reasoning: 0,
         cacheRead: 0,
         cacheWrite: 0,
+      },
+      apiCalls: {
+        count: 2,
+        providers: { anthropic: 2, openai: 0, gemini: 0, bedrock: 0, unknown: 0 },
+        requestBytes: { total: 256, avg: 128, max: 256 },
+        timing: { avgDurationMs: 1500, totalDurationMs: 3000 },
+        estimatedInputTokens: 0,
       },
     },
     snapshot: {
